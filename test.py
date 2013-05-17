@@ -32,7 +32,7 @@ def main():
     
     print "Getting Symbols"
     # symbols = np.loadtxt('sp5002012.txt',dtype='S10',comments='#', skiprows=1)
-    symbols = ['GOOG', 'CVX', 'KIM', 'SPY', 'DELL', 'CAT' ]
+    symbols = ['DEO', 'CVX', 'KIM', 'SPY', 'DELL', 'CAT' ]
     startday = datetime.date(2012, 1 , 1)
     endday = datetime.date(2012, 12, 31)
     
@@ -50,6 +50,7 @@ def main():
             print "Could not obtain data for: " + symbol
         
     print "Analyzing Signals"
+    print dataAll['DEO']
     signals = []
     for symbol in dataAll.keys():
         generateSignals(symbol,dataAll, signals)
@@ -58,4 +59,4 @@ def main():
         signals2[timestamp].extend([[symbol, rating]])
     return (dataAll.keys(), signals2, dataAll, index)
     
-    
+main()

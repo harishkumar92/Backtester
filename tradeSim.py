@@ -1,86 +1,77 @@
-import argparse
-import datetime as dt
+import marketSimulator
 import pandas as pd
-import csv
-import datetime as dt
 
-import qstkutil.qsdateutil as du
-import qstkutil.DataAccess as da
-import pandas.io.data as web
-
-
-signals = {}
-symbols = []
+import matplotlib.pyplot as plt
+import QSTK.qstkutil.tsutil as tsu
 
 
 
-print "Using signals.csv"
-with open ('signals.csv', 'rU') as inputFile:
-    reader = csv.reader(inputFile, "excel")
-    for row in reader:
-
-        if row != []:
-            print row
-            time = dt.datetime(int(row[0]), int(row[1]), int(row[2]), 16, 0)
-            symbols.append(row[3])
-            try:
-                signals[time].append([row[3], row[4], row[5]])
-            except:
-                signals[time] = [[row[3], row[4], row[5]]]
-
-print "Getting data"
-symbols = list(set(symbols))
-startday = min(signals.keys())
-endday = max(signals.keys())
-timestamps = (signals.keys())
-timestamps= sorted(timestamps)
 
 
-
-current_cash = 1000000
-curr_ownership={}
-fundValue=[]
-
-for symbol in symbols:
-    curr_ownership[symbol] = 0
-
-print "Computing values"
-
-for time in timestamps:
-    time2 = dt.datetime(time.year, time.month, time.day)
-    if signals.has_key(time):
-        for signal in signals[time]:
-            symbol = signal[0]
-            amt = int(signal[2])
-            if signal[1] == 'BUY':
-                current_cash = current_cash - (dataAll[symbol].Close[time2]* amt)
-                curr_ownership[symbol] = curr_ownership[symbol] + amt
-                #print str(amt) + " shares of " + symbol + " were bought"
-
-            elif signal[1] == 'SELL':
-                current_cash = current_cash + (dataAll[symbol].Close[time2]* amt)
-                curr_ownership[symbol] = curr_ownership[symbol] - int(signal[2])
-                #print str(amt) + " shares of " + symbol + " were sold"
-            else:
-                amt2 = curr_ownership[symbol]
-                if (amt2 != 0):#if we have that stock, we exit the position
-                    current_cash = (current_cash + (dataAll[symbol].Close[time2] * amt2))
+def main():
+    (symbols, signals, dataAll, index2) = marketSimulator.main()
+    curr_ownership = {} # KEY: TICKER, VALUE: NUMBER OF SHARES SOLD
+    curr_cash = 10000
+    fundValue = pd.Series(index = index2)
+    for timestamp in index2:
+        for (symbol, rating) in signals[timestamp]:
+            owned = curr_ownership.get(symbol, 0)
+            if rating == 0:
+                if owned == 0:
+                    pass
+                elif owned > 0:# if we own that stock, sell all of it
+                    curr_price = dataAll[symbol].Close[timestamp]
+                    curr_cash += curr_price * owned
                     curr_ownership[symbol] = 0
-
-        stockvalue = 0
-        for symbol in symbols:
-            stockvalue = stockvalue + (curr_ownership[symbol] * dataAll[symbol].Close[time2])
-        #print "STOCK VALUE: "  + str(stockvalue)
-        print curr_ownership
-        #print "CURRENT CASH: " + str(current_cash)
-        print "TOTAL VALUE: " + str(stockvalue + current_cash)
-        print time
-
-        fundValue.append([time, (stockvalue + current_cash)])
-
-
-print "Writing values into csv file"
-with open ('performance.csv', 'w') as performance:
-    writer = csv.writer(performance)
-    for value in fundValue:
-        writer.writerow([value[0], value[1]])
+                elif owned < 0:# if we owe that stock to someone else
+                    curr_price = dataAll[symbol].Close[timestamp]
+                    curr_cash -= curr_price * owned
+                    curr_ownership[symbol] = 0
+            elif (rating > 0) or (rating > 0):# buy signal
+                amt = rating * 100
+                # print "BOUGHT ", amt ,"", symbol, "SHARES ON ", timestamp
+                curr_price = dataAll[symbol].Close[timestamp]
+                curr_ownership[symbol] = owned + amt 
+                curr_cash -= amt * curr_price
+        fundValue[timestamp] = computeStockValue(curr_ownership, dataAll, timestamp, sorted(list(index2))) +  curr_cash
+    print fundValue
+    plt.clf()
+    plt.plot(fundValue)
+    plt.savefig('fund.pdf', format='pdf')
+    
+    plt.clf()
+    tsu.returnize1(fundValue.values)
+    plt.plot(fundValue.index, fundValue.values)
+    plt.xlabel("date")
+    plt.ylabel("returns",)
+    plt.savefig("returns.pdf", format = 'pdf')
+    return fundValue
+                
+                
+    
+    
+def computeStockValue(ownership, dataAll, time, timestamps):
+    total = 0.0
+    for symbol in ownership.keys():
+        total += lastKnownPrice(symbol, dataAll,timestamps, time) * ownership[symbol]
+    return total
+        
+    
+    
+def lastKnownPrice(symbol, dataAll, timestamps, time):
+    curr_index = timestamps.index(time)
+    time2 = time
+    while curr_index >= 0:
+        if time2 in dataAll[symbol].Close.index:
+            if time != time2:
+                print "INTIAL TIME: ", time
+                print "CHOSEN TIME: ", time2
+            return dataAll[symbol].Close[time2]
+        else:
+            curr_index = curr_index - 1
+            time2 = timestamps[curr_index]
+    print "INACCURACY"
+    return 0
+    
+    
+main()
