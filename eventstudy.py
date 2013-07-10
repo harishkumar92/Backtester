@@ -61,73 +61,82 @@ def get_args(func_list):
 
 def find_events(ls_symbols, d_data):
     ''' Finding the event dataframe '''
-    df_close = d_data['close']
-    ts_market = df_close['SPY']
-
-    print "Finding Events"
-
-    # Creating an empty dataframe
-    df_events = copy.deepcopy(df_close)
-    df_events = df_events * np.NAN
-
-    # Time stamps for the event range
-    ldt_timestamps = df_close.index
-
-    for s_sym in ls_symbols:
-        for i in range(1, len(ldt_timestamps)):
-            # Calculating the returns for this timestamp
-            f_symprice_today = df_close[s_sym].ix[ldt_timestamps[i]]
-            f_symprice_yest = df_close[s_sym].ix[ldt_timestamps[i - 1]]
-            f_marketprice_today = ts_market.ix[ldt_timestamps[i]]
-            f_marketprice_yest = ts_market.ix[ldt_timestamps[i - 1]]
-            f_symreturn_today = (f_symprice_today / f_symprice_yest) - 1
-            f_marketreturn_today = (f_marketprice_today / f_marketprice_yest) - 1
-
-            # Event is found if the symbol is down more then 3% while the
-            # market is up more then 2%
-            if f_symreturn_today <= -0.03 and f_marketreturn_today >= 0.02:
-                df_events[s_sym].ix[ldt_timestamps[i]] = 1
-
-    return df_events
+    pass
 def find_indicators(ls_symbols, d_data):
+    success = True
     indicators={}
-    indicator_list = ['RSI', 'ADX']
+    indicator_list = ['RSI']
     func2args =  get_args(indicator_list)
     for a in indicator_list:
         b = copy.deepcopy(d_data['close'])
         b = b* np.NaN
         indicators[a] = b
-    ldt_timestamps = d_data['close'].index
+    failed = 0
     for s_sym in ls_symbols:
+        
         print "Finding indicators for : " + s_sym
-        for i in range(0, len(ldt_timestamps)):
-            for a in indicator_list:
-                eval_string = 'ta.' + a + '()'
-                print eval_string
-                eval(eval_string)
+        """
+        for a in indicator_list:
             
+            proper_args = f(func2args, a)
+            
+            eval_string = 'ta.' + a + '('
+            for i in range(len(proper_args) - 1):
+                eval_string +=  'd_data["%s"][s_sym]' % (proper_args[i]) + ','
+            eval_string += 'd_data["%s"][s_sym])' % (proper_args[len(proper_args) - 1])
+            print eval_string
+            try:
+                indicators[a][s_sym] = eval(eval_string)
+            except Exception as e:
+                print e.message
+                success = False
+    if success:
+        print "YAYAYJGSJHGDJDGJSHDSJDSDFHGSFHSFDHGSDGHSD"
+    return indicators
+    """
+        try:
+            indicators['RSI'][s_sym] = ta.RSI(d_data['close'][s_sym])
+            # print indicators['RSI'][s_sym]
+            print d_data['actual_close'][s_sym]
+        except Exception as e:
+            failed = failed + 1
+            print e.message
+    print float(failed) / float(len(ls_symbols))        
 
+            
+def f(func2args, func_name):
+    raw_list = func2args[func_name]
+    for i in range(len(raw_list)):
+        if raw_list[i] == 'inReal':
+            raw_list[i] = 'close'
+        else:
+            raw_list[i] = raw_list[i].lower()
+        
+    return raw_list
+            
+            
 if __name__ == '__main__':
     year = '2013'
     quarter = '2'
     symbol_groups = ['DJIA', 'NASDAQ', 'NYSE', 'SP500']
     names = ['djia','nasdaq', 'nyse', 'sp500']
-    group = symbol_groups[2]
+    group = symbol_groups[0]
     grouptofile = dict(zip(symbol_groups, names))
     filename = grouptofile[group] + '-' + year + '-' + quarter
     
-    dt_start = dt.datetime(2008, 1, 1)
-    dt_end = dt.datetime(2009, 12, 31)
+    dt_start = dt.datetime(2012, 1, 1)
+    dt_end = dt.datetime(2013, 1, 1)
     ldt_timestamps = du.getNYSEdays(dt_start, dt_end, dt.timedelta(hours=16))
     ls_symbols = np.loadtxt('./lists/' + group + '/' + filename ,dtype='S10',comments='#', skiprows=1)
-    
     dataobj = da.DataAccess('Yahoo')
     ls_keys = ['open', 'high', 'low', 'close', 'volume', 'actual_close']
     ldf_data = dataobj.get_data(ldt_timestamps, ls_symbols, ls_keys)
+    
+    
     d_data = dict(zip(ls_keys, ldf_data))
     indicators = find_indicators(ls_symbols, d_data)
     df_events = find_events(ls_symbols, d_data)
     print "Creating Study"
-    ep.eventprofiler(df_events, d_data, i_lookback=20, i_lookforward=20,
-                s_filename='MyEventStudy.pdf', b_market_neutral=True, b_errorbars=True,
-                s_market_sym='SPY')
+    #ep.eventprofiler(df_events, d_data, i_lookback=20, i_lookforward=20,
+    #            s_filename='MyEventStudy.pdf', b_market_neutral=True, b_errorbars=True,
+    #           s_market_sym='SPY')
